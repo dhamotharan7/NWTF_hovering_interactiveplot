@@ -1,0 +1,20 @@
+/* NWTF pilot — automatic scientific previews, six replicated CSV datasets */
+window.NWTF=(()=>{
+const prefix='rae9645_Re1.1_sine_mean15_amp10_pf1-97_pulsed_';
+const datasets=[20,25,30,35,40,45].map(psi=>({id:'p'+psi,psi,label:Math.round(psi*6.894757)+' kPa ('+psi+' psi), 15° mean pitch',file:prefix+'p'+psi+'_f71_dc0-5.csv'}));
+const files=new Map(datasets.map(d=>[d.file,d]));const cache=new Map();
+function identify(url){try{return files.get(decodeURIComponent(new URL(url,location.href).pathname.split('/').pop()))||null}catch{return null}}
+function load(d){if(!cache.has(d.id))cache.set(d.id,fetch('./'+d.file).then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.text()}).then(t=>{
+ const l=t.replace(/^\uFEFF/,'').trim().split(/\r?\n/);const columns=l.shift().split(',').map(s=>s.trim());const rows=l.filter(Boolean).map(s=>s.split(',').map(Number)).filter(r=>r.length===columns.length&&r.every(Number.isFinite));if(!rows.length)throw Error('No numeric data');return {columns,rows};
+}).catch(e=>{cache.delete(d.id);throw e}));return cache.get(d.id)}
+function render(el,data,x,ys,compact=false){const idx=data.columns.indexOf(x);return Plotly.react(el,ys.map(y=>({type:'scatter',mode:'lines',name:y,x:data.rows.map(r=>r[idx]),y:data.rows.map(r=>r[data.columns.indexOf(y)]),line:{width:2}})),{
+ margin:compact?{l:50,r:10,t:15,b:45}:{l:65,r:20,t:22,b:58},xaxis:{title:{text:x},automargin:true},yaxis:{title:{text:ys.length===1?ys[0]:'Aerodynamic coefficients'},automargin:true},legend:{orientation:'h',y:-.32},showlegend:ys.length>1,hovermode:'closest',paper_bgcolor:'white',plot_bgcolor:'white',font:{size:compact?11:13}
+ },{responsive:true,displayModeBar:!compact,scrollZoom:!compact})}
+function initHover(){const arr=[...document.querySelectorAll('a[href]')].map(a=>({a,d:identify(a.href)})).filter(x=>x.d);let seq=0,timer;
+const tip=document.createElement('div');tip.style.cssText='position:fixed;display:none;pointer-events:none;z-index:99999;width:min(540px,94vw);padding:12px;border-radius:11px;border:1px solid #cbd5e1;background:white;box-shadow:0 14px 36px #0004;font:13px Arial';tip.innerHTML='<b id="nwtf-title"></b><div id="nwtf-graph" style="height:320px"></div><small>Angle-of-attack cycle in measured order · click to open original CSV</small>';document.body.append(tip);
+for(const {a,d} of arr){a.title='Hover for automatic aerodynamic plot';a.addEventListener('mouseenter',()=>{const k=++seq;clearTimeout(timer);timer=setTimeout(async()=>{const w=Math.min(540,innerWidth*.94),h=390,r=a.getBoundingClientRect();tip.style.left=Math.max(5,Math.min(r.left,innerWidth-w-5))+'px';tip.style.top=(r.bottom+h+10<innerHeight?r.bottom+7:Math.max(5,r.top-h-7))+'px';tip.style.display='block';tip.querySelector('#nwtf-title').textContent=d.label;const el=tip.querySelector('#nwtf-graph');el.textContent='Loading data…';try{const data=await load(d);if(k!==seq)return;el.textContent='';await render(el,data,'alpha(degrees)',['C_N','C_M','C_T'],true)}catch(e){if(k===seq)el.textContent='Preview unavailable: '+e.message}},230)});a.addEventListener('mouseleave',()=>{++seq;clearTimeout(timer);tip.style.display='none'})}
+const anchor=document.querySelector('#datasets')||document.querySelector('h3[id="datasets"]')||document.body;
+const link=document.createElement('a');link.href='./viewer.html';link.target='_blank';link.rel='noopener';link.textContent='Interactive Plots — compare datasets ↗';link.style.cssText='display:inline-block;padding:11px 18px;background:#176e99;color:#fff;border-radius:6px;text-decoration:none;font:bold 15px Arial;margin:12px 0';anchor.parentNode.insertBefore(link,anchor.nextSibling);
+const note=document.createElement('p');note.textContent='Demo: hover plotting is available on the six GitHub-hosted pitching datasets (15° column).';note.style.cssText='font:12px Arial;color:#687787';link.insertAdjacentElement('afterend',note)}
+return {datasets,load,render,initHover};})();
+document.addEventListener('DOMContentLoaded',()=>{if(document.querySelector('h1#air-jet-flow-control-on-pitching-aerofoil'))NWTF.initHover()});

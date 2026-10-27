@@ -1,0 +1,10 @@
+document.addEventListener('DOMContentLoaded',()=>{
+const root=document.querySelector('#panels');let counter=0;
+const opt=(value,label)=>{const o=document.createElement('option');o.value=value;o.textContent=label;return o};
+function add(){counter++;const p=document.createElement('section');p.className='panel';p.innerHTML='<div class="controls"><label>Dataset<select class="dataset"></select></label><label>X axis<select class="xaxis"></select></label><label>Y axis<select class="yaxis"></select></label><button class="remove" title="Remove panel">×</button></div><div class="chart"></div><p class="info" aria-live="polite"></p>';root.append(p);
+const ds=p.querySelector('.dataset'),xs=p.querySelector('.xaxis'),ys=p.querySelector('.yaxis'),chart=p.querySelector('.chart'),info=p.querySelector('.info');NWTF.datasets.forEach(d=>ds.append(opt(d.id,d.label)));ds.value=NWTF.datasets[(counter-1)%6].id;let token=0,data;
+async function choose(){const k=++token,d=NWTF.datasets.find(x=>x.id===ds.value);info.textContent='Loading '+d.label+'…';try{data=await NWTF.load(d);if(k!==token)return;xs.replaceChildren(...data.columns.map(c=>opt(c,c)));ys.replaceChildren(...data.columns.map(c=>opt(c,c)));xs.value=data.columns.includes('alpha(degrees)')?'alpha(degrees)':data.columns[0];ys.value=data.columns.includes('C_N')?'C_N':data.columns[1];await draw();info.textContent=data.rows.length+' measured rows · '+d.label}catch(e){if(k===token)info.textContent='CSV unavailable: '+e.message}}
+async function draw(){if(data)await NWTF.render(chart,data,xs.value,[ys.value])}
+ds.addEventListener('change',choose);xs.addEventListener('change',draw);ys.addEventListener('change',draw);p.querySelector('.remove').addEventListener('click',()=>{Plotly.purge(chart);p.remove()});choose()}
+document.querySelector('#add').addEventListener('click',add);add();add();
+});
